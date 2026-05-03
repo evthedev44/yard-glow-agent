@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Yard Glow Property Research</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDhDOySjOjVHpBW4qnN5QEjRYqQ6UlqBqw=places"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: #f0f4f0;
@@ -194,6 +195,35 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+
+        /* Google autocomplete dropdown styling */
+        .pac-container {
+            border-radius: 10px;
+            border: 2px solid #2d5a27;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin-top: 4px;
+        }
+
+        .pac-item {
+            padding: 10px 16px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .pac-item:hover {
+            background: #f0f4f0;
+        }
+
+        .pac-item-query {
+            font-size: 14px;
+            color: #1a1a1a;
+        }
+
+        .pac-matched {
+            color: #2d5a27;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -211,11 +241,10 @@
     <div class="search-box">
         <label>Enter a property address to research</label>
         <div class="search-row">
-            <input 
-                type="text" 
-                id="address" 
-                placeholder="e.g. 4821 Barton Creek Blvd, Austin TX"
-                onkeydown="if(event.key==='Enter') research()"
+            <input
+                type="text"
+                id="address"
+                placeholder="Start typing an address..."
             />
             <button onclick="research()" id="btn">Research Property</button>
         </div>
@@ -245,6 +274,33 @@
 </div>
 
 <script>
+    // Initialize Google Places Autocomplete
+    function initAutocomplete() {
+        const input = document.getElementById("address");
+        
+        const autocomplete = new google.maps.places.Autocomplete(input, {
+            types: ["address"],
+            componentRestrictions: { country: "us" },
+            fields: ["formatted_address"]
+        });
+
+        // When user selects an address trigger research automatically
+        autocomplete.addListener("place_changed", function() {
+            const place = autocomplete.getPlace();
+            if (place.formatted_address) {
+                input.value = place.formatted_address;
+            }
+        });
+
+        // Also allow Enter key to trigger research
+        input.addEventListener("keydown", function(e) {
+            if (e.key === "Enter") {
+                // Small delay to let autocomplete selection register
+                setTimeout(research, 100);
+            }
+        });
+    }
+
     async function research() {
         const address = document.getElementById("address").value.trim();
         if (!address) return;
@@ -289,6 +345,11 @@
         el.textContent = msg;
         el.classList.add("active");
     }
+</script>
+
+<!-- Load autocomplete after page is ready -->
+<script>
+    window.onload = initAutocomplete;
 </script>
 
 </body>

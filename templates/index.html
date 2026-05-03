@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Yard Glow Property Research</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDhDOySjOjVHpBW4qnN5QEjRYqQ6UlqBqw&libraries=places&callback=initAutocomplete" async defer></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -60,19 +59,29 @@
         .search-row {
             display: flex;
             gap: 12px;
+            align-items: center;
         }
 
-        .search-row input {
+        #autocomplete-container {
             flex: 1;
+        }
+
+        /* Style the new PlaceAutocompleteElement */
+        gmp-place-autocomplete {
+            width: 100%;
+        }
+
+        gmp-place-autocomplete input {
+            width: 100%;
             padding: 14px 18px;
             border: 2px solid #e0e0e0;
             border-radius: 10px;
             font-size: 15px;
             outline: none;
-            transition: border-color 0.2s;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
 
-        .search-row input:focus {
+        gmp-place-autocomplete input:focus {
             border-color: #2d5a27;
         }
 
@@ -87,6 +96,7 @@
             cursor: pointer;
             transition: background 0.2s;
             white-space: nowrap;
+            height: 52px;
         }
 
         .search-row button:hover {
@@ -195,35 +205,6 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-
-        /* Google autocomplete dropdown styling */
-        .pac-container {
-            border-radius: 10px;
-            border: 2px solid #2d5a27;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            margin-top: 4px;
-        }
-
-        .pac-item {
-            padding: 10px 16px;
-            font-size: 14px;
-            cursor: pointer;
-        }
-
-        .pac-item:hover {
-            background: #f0f4f0;
-        }
-
-        .pac-item-query {
-            font-size: 14px;
-            color: #1a1a1a;
-        }
-
-        .pac-matched {
-            color: #2d5a27;
-            font-weight: 600;
-        }
     </style>
 </head>
 <body>
@@ -241,11 +222,7 @@
     <div class="search-box">
         <label>Enter a property address to research</label>
         <div class="search-row">
-            <input
-                type="text"
-                id="address"
-                placeholder="Start typing an address..."
-            />
+            <div id="autocomplete-container"></div>
             <button onclick="research()" id="btn">Research Property</button>
         </div>
         <div class="status" id="status">
@@ -274,38 +251,35 @@
 </div>
 
 <script>
-    // Initialize Google Places Autocomplete
-    function initAutocomplete() {
-        const input = document.getElementById("address");
-        
-        const autocomplete = new google.maps.places.Autocomplete(input, {
+    let selectedAddress = "";
+
+    async function initMap() {
+        const { PlaceAutocompleteElement } = await google.maps.importLibrary("places");
+
+        const placeAutocomplete = new PlaceAutocompleteElement({
             types: ["address"],
-            componentRestrictions: { country: "us" },
-            fields: ["formatted_address"]
+            componentRestrictions: { country: "us" }
         });
 
-        // When user selects an address trigger research automatically
-        autocomplete.addListener("place_changed", function() {
-            const place = autocomplete.getPlace();
-            if (place.formatted_address) {
-                input.value = place.formatted_address;
-            }
-        });
+        placeAutocomplete.style.width = "100%";
+        document.getElementById("autocomplete-container").appendChild(placeAutocomplete);
 
-        // Also allow Enter key to trigger research
-        input.addEventListener("keydown", function(e) {
-            if (e.key === "Enter") {
-                // Small delay to let autocomplete selection register
-                setTimeout(research, 100);
-            }
+        placeAutocomplete.addEventListener("gmp-placeselect", async (event) => {
+            const place = event.place;
+            await place.fetchFields({ fields: ["formattedAddress"] });
+            selectedAddress = place.formattedAddress;
         });
     }
 
     async function research() {
-        const address = document.getElementById("address").value.trim();
-        if (!address) return;
+        const address = selectedAddress || 
+            document.querySelector("#autocomplete-container input")?.value?.trim();
+        
+        if (!address) {
+            showError("Please enter and select an address.");
+            return;
+        }
 
-        // Reset UI
         document.getElementById("results").classList.remove("active");
         document.getElementById("error").classList.remove("active");
         document.getElementById("status").classList.add("active");
@@ -326,7 +300,6 @@
                 return;
             }
 
-            // Show results
             document.getElementById("brief").textContent = data.brief;
             document.getElementById("street-view").src = data.street_view;
             document.getElementById("aerial").src = data.aerial;
@@ -347,6 +320,10 @@
     }
 </script>
 
+<script
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDhDOySjOjVHpBW4qnN5QEjRYqQ6UlqBqw&callback=initMap&libraries=places&v=beta"
+    async defer>
+</script>
 
 </body>
 </html>

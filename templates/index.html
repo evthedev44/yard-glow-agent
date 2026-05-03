@@ -270,16 +270,11 @@
             selectedAddress = place.formattedAddress;
             console.log("Address selected:", selectedAddress);
         });
-
-        // Fallback — capture whatever is typed
-        placeAutocomplete.addEventListener("input", (event) => {
-            selectedAddress = event.target.value;
-        });
     }
 
     async function research() {
-        const inputVal = document.querySelector("#autocomplete-container input")?.value?.trim();
-        const address = selectedAddress || inputVal;
+        const address = selectedAddress || 
+            document.querySelector("#autocomplete-container input")?.value?.trim();
 
         if (!address) {
             showError("Please enter an address.");

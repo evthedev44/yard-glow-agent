@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Yard Glow Property Research</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDhDOySjOjVHpBW4qnN5QEjRYqQ6UlqBqw=places"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDhDOySjOjVHpBW4qnN5QEjRYqQ6UlqBqw&libraries=places&callback=initAutocomplete" async defer></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -347,10 +347,6 @@
     }
 </script>
 
-<!-- Load autocomplete after page is ready -->
-<script>
-    window.onload = initAutocomplete;
-</script>
 
 </body>
 </html>

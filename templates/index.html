@@ -66,7 +66,6 @@
             flex: 1;
         }
 
-        /* Style the new PlaceAutocompleteElement */
         gmp-place-autocomplete {
             width: 100%;
         }
@@ -264,22 +263,30 @@
         placeAutocomplete.style.width = "100%";
         document.getElementById("autocomplete-container").appendChild(placeAutocomplete);
 
+        // Capture address when user selects from dropdown
         placeAutocomplete.addEventListener("gmp-placeselect", async (event) => {
             const place = event.place;
             await place.fetchFields({ fields: ["formattedAddress"] });
             selectedAddress = place.formattedAddress;
+            console.log("Address selected:", selectedAddress);
+        });
+
+        // Fallback — capture whatever is typed
+        placeAutocomplete.addEventListener("input", (event) => {
+            selectedAddress = event.target.value;
         });
     }
 
     async function research() {
-        const address = selectedAddress || 
-            document.querySelector("#autocomplete-container input")?.value?.trim();
-        
+        const inputVal = document.querySelector("#autocomplete-container input")?.value?.trim();
+        const address = selectedAddress || inputVal;
+
         if (!address) {
-            showError("Please enter and select an address.");
+            showError("Please enter an address.");
             return;
         }
 
+        // Reset UI
         document.getElementById("results").classList.remove("active");
         document.getElementById("error").classList.remove("active");
         document.getElementById("status").classList.add("active");

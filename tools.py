@@ -2,116 +2,196 @@ import os
 import requests
 
 # ─── Tool Definitions ───────────────────────────────────────────────────────
-# These tell Claude what tools exist and when to use them
 
 TOOLS = [
     {
+        "name": "get_property_data",
+        "description": "Get detailed property data including value, owner, last sale, lot size, and structure details from a property address.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "description": "Full property address e.g. '123 Main St, Austin, TX 78701'"
+                }
+            },
+            "required": ["address"]
+        }
+    },
+    {
+        "name": "get_property_owner",
+        "description": "Get owner information and sale history for a property.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "description": "Full property address"
+                }
+            },
+            "required": ["address"]
+        }
+    },
+    {
         "name": "search_web",
-        "description": "Search the web for property information, owner details, tax records, permits, and any other public data about a property or address.",
+        "description": "Search the web for additional property information such as permits, HOA details, or neighborhood info.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "The search query. Be specific — include the full address and what you're looking for. Example: '4821 Barton Creek Blvd Austin TX owner history tax record'"
+                    "description": "The search query"
                 }
             },
             "required": ["query"]
-        }
-    },
-    {
-        "name": "fetch_page",
-        "description": "Fetch the full content of a webpage to extract property details, tax records, or permit information.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "url": {
-                    "type": "string",
-                    "description": "The full URL of the page to fetch"
-                }
-            },
-            "required": ["url"]
         }
     }
 ]
 
 
 # ─── Tool Executor ───────────────────────────────────────────────────────────
-# This actually runs the tool when Claude asks for it
 
 def run_tool(tool_name, tool_input):
-    if tool_name == "search_web":
+    if tool_name == "get_property_data":
+        return get_property_data(tool_input["address"])
+    elif tool_name == "get_property_owner":
+        return get_property_owner(tool_input["address"])
+    elif tool_name == "search_web":
         return search_web(tool_input["query"])
-    elif tool_name == "fetch_page":
-        return fetch_page(tool_input["url"])
     else:
         return f"Unknown tool: {tool_name}"
 
 
-# ─── Individual Tool Functions ───────────────────────────────────────────────
+# ─── Rentcast API Functions ──────────────────────────────────────────────────
+
+def get_property_data(address):
+    """Get property details from Rentcast API"""
+    api_key = os.getenv("RENTCAST_API_KEY")
+    
+    headers = {
+        "X-Api-Key": api_key,
+        "Content-Type": "application/json"
+    }
+    
+    params = {"address": address}
+    
+    try:
+        # Get property details
+        response = requests.get(
+            "https://api.rentcast.io/v1/properties",
+            headers=headers,
+            params=params
+        )
+        
+        if response.status_code != 200:
+            return f"Error fetching property data: {response.status_code} - {response.text}"
+        
+        data = response.json()
+        
+        if not data:
+            return "No property data found for this address."
+        
+        # Handle both list and dict responses
+        prop = data[0] if isinstance(data, list) else data
+        
+        # Format the data cleanly for Claude
+        result = f"""
+PROPERTY DATA FROM RENTCAST:
+Address: {prop.get('formattedAddress', 'N/A')}
+Property Type: {prop.get('propertyType', 'N/A')}
+Bedrooms: {prop.get('bedrooms', 'N/A')}
+Bathrooms: {prop.get('bathrooms', 'N/A')}
+Square Footage: {prop.get('squareFootage', 'N/A')} sqft
+Lot Size: {prop.get('lotSize', 'N/A')} sqft
+Year Built: {prop.get('yearBuilt', 'N/A')}
+Last Sale Price: ${prop.get('lastSalePrice', 'N/A'):,} if isinstance(prop.get('lastSalePrice'), int) else {prop.get('lastSalePrice', 'N/A')}
+Last Sale Date: {prop.get('lastSaleDate', 'N/A')}
+HOA Fee: {prop.get('hoaFee', 'None')}
+County: {prop.get('county', 'N/A')}
+APN: {prop.get('assessorParcelNumber', 'N/A')}
+"""
+        return result
+        
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+
+def get_property_owner(address):
+    """Get owner and valuation data from Rentcast"""
+    api_key = os.getenv("RENTCAST_API_KEY")
+    
+    headers = {
+        "X-Api-Key": api_key,
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        # Get valuation
+        val_response = requests.get(
+            "https://api.rentcast.io/v1/avm/value",
+            headers=headers,
+            params={"address": address}
+        )
+        
+        result = "VALUATION DATA:\n"
+        
+        if val_response.status_code == 200:
+            val = val_response.json()
+            price = val.get('price', 'N/A')
+            price_low = val.get('priceLow', 'N/A')
+            price_high = val.get('priceHigh', 'N/A')
+            result += f"""
+Estimated Value: ${price:,} if isinstance(price, int) else {price}
+Value Range: ${price_low:,} - ${price_high:,} if isinstance(price_low, int) else {price_low} - {price_high}
+"""
+        else:
+            result += f"Valuation not available: {val_response.status_code}\n"
+        
+        return result
+        
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 
 def search_web(query):
     """Search the web using Google Custom Search API"""
     api_key = os.getenv("GOOGLE_API_KEY")
-    cx = os.getenv("GOOGLE_CX")  # Custom Search Engine ID
-
+    cx = os.getenv("GOOGLE_CX")
+    
     url = "https://www.googleapis.com/customsearch/v1"
     params = {
         "key": api_key,
         "cx": cx,
         "q": query,
-        "num": 5  # return top 5 results
+        "num": 5
     }
-
+    
     try:
         response = requests.get(url, params=params)
         data = response.json()
-
+        
         if "items" not in data:
-            return "No results found for this search."
-
+            return "No results found."
+        
         results = []
         for item in data["items"]:
             results.append(f"Title: {item['title']}\nURL: {item['link']}\nSnippet: {item['snippet']}\n")
-
+        
         return "\n---\n".join(results)
-
+        
     except Exception as e:
         return f"Search error: {str(e)}"
 
 
-def fetch_page(url):
-    """Fetch the text content of a webpage"""
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=10)
-        
-        # Very basic HTML stripping — just get the text
-        text = response.text
-        
-        # Remove script and style blocks
-        import re
-        text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.DOTALL)
-        text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL)
-        text = re.sub(r'<[^>]+>', ' ', text)
-        text = re.sub(r'\s+', ' ', text).strip()
-        
-        # Return first 3000 characters — enough for Claude to extract what it needs
-        return text[:3000]
-
-    except Exception as e:
-        return f"Error fetching page: {str(e)}"
-
+# ─── Google Photo URLs ───────────────────────────────────────────────────────
 
 def get_street_view_url(address):
-    """Generate a Google Street View image URL for the property"""
     api_key = os.getenv("GOOGLE_API_KEY")
     encoded = requests.utils.quote(address)
     return f"https://maps.googleapis.com/maps/api/streetview?size=800x400&location={encoded}&key={api_key}"
 
 
 def get_aerial_url(address):
-    """Generate a Google Maps Static aerial image URL for the property"""
     api_key = os.getenv("GOOGLE_API_KEY")
     encoded = requests.utils.quote(address)
     return f"https://maps.googleapis.com/maps/api/staticmap?center={encoded}&zoom=18&size=800x400&maptype=satellite&key={api_key}"

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yard Glow Property Research</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f0f4f0;
+            min-height: 100vh;
+        }
+
+        header {
+            background: #2d5a27;
+            color: white;
+            padding: 20px 40px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        header p {
+            font-size: 13px;
+            opacity: 0.7;
+            margin-top: 2px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .search-box {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            margin-bottom: 32px;
+        }
+
+        .search-box label {
+            display: block;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 10px;
+            font-size: 15px;
+        }
+
+        .search-row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .search-row input {
+            flex: 1;
+            padding: 14px 18px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-row input:focus {
+            border-color: #2d5a27;
+        }
+
+        .search-row button {
+            background: #2d5a27;
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+
+        .search-row button:hover {
+            background: #3d7a35;
+        }
+
+        .search-row button:disabled {
+            background: #aaa;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-top: 16px;
+            font-size: 14px;
+            color: #666;
+            display: none;
+        }
+
+        .status.active {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ddd;
+            border-top-color: #2d5a27;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .results { display: none; }
+        .results.active { display: block; }
+
+        .photos {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .photo-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .photo-card img {
+            width: 100%;
+            height: 220px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .photo-card .photo-label {
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .brief-card {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+
+        .brief-card pre {
+            font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            color: #1a1a1a;
+        }
+
+        .error {
+            background: #fff0f0;
+            border: 1px solid #ffcccc;
+            border-radius: 10px;
+            padding: 16px 20px;
+            color: #cc0000;
+            font-size: 14px;
+            margin-top: 16px;
+            display: none;
+        }
+
+        .error.active { display: block; }
+
+        .badge {
+            background: #e8f5e8;
+            color: #2d5a27;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div>
+        <h1>🌿 Yard Glow</h1>
+        <p>Property Research Agent</p>
+    </div>
+    <span class="badge">AI Powered</span>
+</header>
+
+<div class="container">
+
+    <div class="search-box">
+        <label>Enter a property address to research</label>
+        <div class="search-row">
+            <input 
+                type="text" 
+                id="address" 
+                placeholder="e.g. 4821 Barton Creek Blvd, Austin TX"
+                onkeydown="if(event.key==='Enter') research()"
+            />
+            <button onclick="research()" id="btn">Research Property</button>
+        </div>
+        <div class="status" id="status">
+            <div class="spinner"></div>
+            <span id="status-text">Researching property...</span>
+        </div>
+        <div class="error" id="error"></div>
+    </div>
+
+    <div class="results" id="results">
+        <div class="photos">
+            <div class="photo-card">
+                <img id="street-view" src="" alt="Street View" />
+                <div class="photo-label">📍 Street View</div>
+            </div>
+            <div class="photo-card">
+                <img id="aerial" src="" alt="Aerial View" />
+                <div class="photo-label">🛰️ Aerial View</div>
+            </div>
+        </div>
+        <div class="brief-card">
+            <pre id="brief"></pre>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    async function research() {
+        const address = document.getElementById("address").value.trim();
+        if (!address) return;
+
+        // Reset UI
+        document.getElementById("results").classList.remove("active");
+        document.getElementById("error").classList.remove("active");
+        document.getElementById("status").classList.add("active");
+        document.getElementById("btn").disabled = true;
+        document.getElementById("status-text").textContent = "Researching property — this takes 30-60 seconds...";
+
+        try {
+            const response = await fetch("/research", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ address })
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                showError(data.error);
+                return;
+            }
+
+            // Show results
+            document.getElementById("brief").textContent = data.brief;
+            document.getElementById("street-view").src = data.street_view;
+            document.getElementById("aerial").src = data.aerial;
+            document.getElementById("results").classList.add("active");
+
+        } catch (err) {
+            showError("Something went wrong. Please try again.");
+        } finally {
+            document.getElementById("status").classList.remove("active");
+            document.getElementById("btn").disabled = false;
+        }
+    }
+
+    function showError(msg) {
+        const el = document.getElementById("error");
+        el.textContent = msg;
+        el.classList.add("active");
+    }
+</script>
+
+</body>
+</html>

@@ -22,17 +22,8 @@
             gap: 16px;
         }
 
-        header h1 {
-            font-size: 24px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-        }
-
-        header p {
-            font-size: 13px;
-            opacity: 0.7;
-            margin-top: 2px;
-        }
+        header h1 { font-size: 24px; font-weight: 700; }
+        header p { font-size: 13px; opacity: 0.7; margin-top: 2px; }
 
         .container {
             max-width: 900px;
@@ -56,33 +47,30 @@
             font-size: 15px;
         }
 
+        .hint {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 12px;
+        }
+
         .search-row {
             display: flex;
             gap: 12px;
             align-items: center;
         }
 
-        #autocomplete-container {
+        .search-row input {
             flex: 1;
-        }
-
-        gmp-place-autocomplete {
-            width: 100%;
-        }
-
-        gmp-place-autocomplete input {
-            width: 100%;
             padding: 14px 18px;
             border: 2px solid #e0e0e0;
             border-radius: 10px;
             font-size: 15px;
             outline: none;
+            transition: border-color 0.2s;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
 
-        gmp-place-autocomplete input:focus {
-            border-color: #2d5a27;
-        }
+        .search-row input:focus { border-color: #2d5a27; }
 
         .search-row button {
             background: #2d5a27;
@@ -93,9 +81,9 @@
             font-size: 15px;
             font-weight: 600;
             cursor: pointer;
-            transition: background 0.2s;
             white-space: nowrap;
             height: 52px;
+            transition: background 0.2s;
         }
 
         .search-row button:hover { background: #3d7a35; }
@@ -211,13 +199,19 @@
 <div class="container">
     <div class="search-box">
         <label>Enter a property address to research</label>
+        <p class="hint">Example: 3901 Balcones Dr, Austin, TX 78731</p>
         <div class="search-row">
-            <div id="autocomplete-container"></div>
+            <input
+                type="text"
+                id="address"
+                placeholder="Street, City, State ZIP"
+                onkeydown="if(event.key==='Enter') research()"
+            />
             <button onclick="research()" id="btn">Research Property</button>
         </div>
         <div class="status" id="status">
             <div class="spinner"></div>
-            <span id="status-text">Researching property...</span>
+            <span id="status-text">Researching property — this takes 30-60 seconds...</span>
         </div>
         <div class="error" id="error"></div>
     </div>
@@ -240,47 +234,18 @@
 </div>
 
 <script>
-    let selectedAddress = "";
-
-    async function initMap() {
-        const { PlaceAutocompleteElement } = await google.maps.importLibrary("places");
-
-        const placeAutocomplete = new PlaceAutocompleteElement({
-            types: ["address"],
-            componentRestrictions: { country: "us" }
-        });
-
-        placeAutocomplete.style.width = "100%";
-        document.getElementById("autocomplete-container").appendChild(placeAutocomplete);
-
-        // Set address when user picks from dropdown
-        placeAutocomplete.addEventListener("gmp-placeselect", async (event) => {
-            const place = event.place;
-            await place.fetchFields({ fields: ["formattedAddress"] });
-            selectedAddress = place.formattedAddress
-                .replace(", USA", "")
-                .trim();
-            console.log("Address set:", selectedAddress);
-        });
-    }
-
     async function research() {
-        // Try selectedAddress first, then fall back to raw input value
-        const rawInput = document.querySelector("#autocomplete-container input");
-        const address = selectedAddress || (rawInput ? rawInput.value.replace(", USA", "").trim() : "");
+        const address = document.getElementById("address").value.trim();
 
         if (!address) {
-            showError("Please type and select an address from the dropdown.");
+            showError("Please enter a property address.");
             return;
         }
-
-        console.log("Researching:", address);
 
         document.getElementById("results").classList.remove("active");
         document.getElementById("error").classList.remove("active");
         document.getElementById("status").classList.add("active");
         document.getElementById("btn").disabled = true;
-        document.getElementById("status-text").textContent = "Researching property — this takes 30-60 seconds...";
 
         try {
             const response = await fetch("/research", {
@@ -314,11 +279,6 @@
         el.textContent = msg;
         el.classList.add("active");
     }
-</script>
-
-<script
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDhDOySjOjVHpBW4qnN5QEjRYqQ6UlqBqw&callback=initMap&libraries=places&v=beta"
-    async defer>
 </script>
 
 </body>

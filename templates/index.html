@@ -98,14 +98,8 @@
             height: 52px;
         }
 
-        .search-row button:hover {
-            background: #3d7a35;
-        }
-
-        .search-row button:disabled {
-            background: #aaa;
-            cursor: not-allowed;
-        }
+        .search-row button:hover { background: #3d7a35; }
+        .search-row button:disabled { background: #aaa; cursor: not-allowed; }
 
         .status {
             margin-top: 16px;
@@ -129,9 +123,7 @@
             animation: spin 0.8s linear infinite;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         .results { display: none; }
         .results.active { display: block; }
@@ -217,7 +209,6 @@
 </header>
 
 <div class="container">
-
     <div class="search-box">
         <label>Enter a property address to research</label>
         <div class="search-row">
@@ -246,7 +237,6 @@
             <pre id="brief"></pre>
         </div>
     </div>
-
 </div>
 
 <script>
@@ -263,25 +253,29 @@
         placeAutocomplete.style.width = "100%";
         document.getElementById("autocomplete-container").appendChild(placeAutocomplete);
 
-        // Capture address when user selects from dropdown
+        // Set address when user picks from dropdown
         placeAutocomplete.addEventListener("gmp-placeselect", async (event) => {
             const place = event.place;
             await place.fetchFields({ fields: ["formattedAddress"] });
-            selectedAddress = place.formattedAddress;
-            console.log("Address selected:", selectedAddress);
+            selectedAddress = place.formattedAddress
+                .replace(", USA", "")
+                .trim();
+            console.log("Address set:", selectedAddress);
         });
     }
 
     async function research() {
-        const address = selectedAddress || 
-            document.querySelector("#autocomplete-container input")?.value?.trim();
+        // Try selectedAddress first, then fall back to raw input value
+        const rawInput = document.querySelector("#autocomplete-container input");
+        const address = selectedAddress || (rawInput ? rawInput.value.replace(", USA", "").trim() : "");
 
         if (!address) {
-            showError("Please enter an address.");
+            showError("Please type and select an address from the dropdown.");
             return;
         }
 
-        // Reset UI
+        console.log("Researching:", address);
+
         document.getElementById("results").classList.remove("active");
         document.getElementById("error").classList.remove("active");
         document.getElementById("status").classList.add("active");

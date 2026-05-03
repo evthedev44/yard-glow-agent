@@ -16,6 +16,8 @@ def index():
 def research():
     data = request.get_json()
     address = data.get("address", "").strip()
+    # Remove ", USA" suffix that Google Places adds
+    address = address.replace(", USA", "").strip()
 
     if not address:
         return jsonify({"error": "Please enter an address"}), 400

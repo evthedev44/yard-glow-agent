@@ -19,8 +19,8 @@ TOOLS = [
         }
     },
     {
-        "name": "get_property_owner",
-        "description": "Get owner information and sale history for a property.",
+        "name": "get_property_valuation",
+        "description": "Get estimated market value for a property.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -54,8 +54,8 @@ TOOLS = [
 def run_tool(tool_name, tool_input):
     if tool_name == "get_property_data":
         return get_property_data(tool_input["address"])
-    elif tool_name == "get_property_owner":
-        return get_property_owner(tool_input["address"])
+    elif tool_name == "get_property_valuation":
+        return get_property_valuation(tool_input["address"])
     elif tool_name == "search_web":
         return search_web(tool_input["query"])
     else:
@@ -67,88 +67,144 @@ def run_tool(tool_name, tool_input):
 def get_property_data(address):
     """Get property details from Rentcast API"""
     api_key = os.getenv("RENTCAST_API_KEY")
-    
+
+    if not api_key:
+        return "Error: RENTCAST_API_KEY not found in environment variables."
+
     headers = {
         "X-Api-Key": api_key,
         "Content-Type": "application/json"
     }
-    
-    params = {"address": address}
-    
+
     try:
-        # Get property details
         response = requests.get(
             "https://api.rentcast.io/v1/properties",
             headers=headers,
-            params=params
+            params={"address": address}
         )
-        
+
         if response.status_code != 200:
             return f"Error fetching property data: {response.status_code} - {response.text}"
-        
+
         data = response.json()
-        
+
         if not data:
             return "No property data found for this address."
-        
-        # Handle both list and dict responses
+
         prop = data[0] if isinstance(data, list) else data
-        
-        # Format the data cleanly for Claude
+
+        # Extract owner info
+        owner = prop.get('owner', {})
+        owner_names = ', '.join(owner.get('names', ['N/A']))
+
+        # Extract last sale price
+        last_sale_price = prop.get('lastSalePrice', 'N/A')
+        last_sale_price_fmt = f"${last_sale_price:,}" if isinstance(last_sale_price, (int, float)) else last_sale_price
+
+        # Extract tax assessed value
+        tax_assessments = prop.get('taxAssessments', {})
+        if tax_assessments:
+            latest_year = max(tax_assessments.keys())
+            tax_assessed = tax_assessments[latest_year].get('value', 'N/A')
+            tax_assessed_fmt = f"${tax_assessed:,}" if isinstance(tax_assessed, (int, float)) else tax_assessed
+        else:
+            tax_assessed_fmt = 'N/A'
+
+        # Extract property taxes
+        property_taxes = prop.get('propertyTaxes', {})
+        if property_taxes:
+            latest_tax_year = max(property_taxes.keys())
+            annual_tax = property_taxes[latest_tax_year].get('total', 'N/A')
+            annual_tax_fmt = f"${annual_tax:,}" if isinstance(annual_tax, (int, float)) else annual_tax
+        else:
+            annual_tax_fmt = 'N/A'
+
+        # Extract features
+        features = prop.get('features', {})
+        garage = features.get('garage', False)
+        fireplace = features.get('fireplace', False)
+        pool = features.get('pool', False)
+        floor_count = features.get('floorCount', 'N/A')
+
+        # Format lot size in acres
+        lot_size_sqft = prop.get('lotSize', 'N/A')
+        if isinstance(lot_size_sqft, (int, float)):
+            lot_size_acres = round(lot_size_sqft / 43560, 2)
+            lot_size_fmt = f"{lot_size_sqft:,} sqft ({lot_size_acres} acres)"
+        else:
+            lot_size_fmt = lot_size_sqft
+
         result = f"""
 PROPERTY DATA FROM RENTCAST:
-Address: {prop.get('formattedAddress', 'N/A')}
-Property Type: {prop.get('propertyType', 'N/A')}
-Bedrooms: {prop.get('bedrooms', 'N/A')}
-Bathrooms: {prop.get('bathrooms', 'N/A')}
-Square Footage: {prop.get('squareFootage', 'N/A')} sqft
-Lot Size: {prop.get('lotSize', 'N/A')} sqft
-Year Built: {prop.get('yearBuilt', 'N/A')}
-Last Sale Price: ${prop.get('lastSalePrice', 'N/A'):,} if isinstance(prop.get('lastSalePrice'), int) else {prop.get('lastSalePrice', 'N/A')}
-Last Sale Date: {prop.get('lastSaleDate', 'N/A')}
-HOA Fee: {prop.get('hoaFee', 'None')}
-County: {prop.get('county', 'N/A')}
-APN: {prop.get('assessorParcelNumber', 'N/A')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Address:          {prop.get('formattedAddress', 'N/A')}
+Owner:            {owner_names}
+Owner Occupied:   {prop.get('ownerOccupied', 'N/A')}
+Property Type:    {prop.get('propertyType', 'N/A')}
+Bedrooms:         {prop.get('bedrooms', 'N/A')}
+Bathrooms:        {prop.get('bathrooms', 'N/A')}
+Square Footage:   {prop.get('squareFootage', 'N/A'):,} sqft
+Lot Size:         {lot_size_fmt}
+Year Built:       {prop.get('yearBuilt', 'N/A')}
+Stories:          {floor_count}
+Garage:           {'Yes' if garage else 'No'}
+Fireplace:        {'Yes' if fireplace else 'No'}
+Pool:             {'Yes' if pool else 'No'}
+Last Sale Price:  {last_sale_price_fmt}
+Last Sale Date:   {prop.get('lastSaleDate', 'N/A')}
+Tax Assessed:     {tax_assessed_fmt}
+Annual Tax:       {annual_tax_fmt}
+County:           {prop.get('county', 'N/A')}
+Subdivision:      {prop.get('subdivision', 'N/A')}
+Legal:            {prop.get('legalDescription', 'N/A')}
 """
         return result
-        
+
     except Exception as e:
         return f"Error: {str(e)}"
 
 
-def get_property_owner(address):
-    """Get owner and valuation data from Rentcast"""
+def get_property_valuation(address):
+    """Get estimated market value from Rentcast AVM"""
     api_key = os.getenv("RENTCAST_API_KEY")
-    
+
+    if not api_key:
+        return "Error: RENTCAST_API_KEY not found in environment variables."
+
     headers = {
         "X-Api-Key": api_key,
         "Content-Type": "application/json"
     }
-    
+
     try:
-        # Get valuation
-        val_response = requests.get(
+        response = requests.get(
             "https://api.rentcast.io/v1/avm/value",
             headers=headers,
             params={"address": address}
         )
-        
-        result = "VALUATION DATA:\n"
-        
-        if val_response.status_code == 200:
-            val = val_response.json()
-            price = val.get('price', 'N/A')
-            price_low = val.get('priceLow', 'N/A')
-            price_high = val.get('priceHigh', 'N/A')
-            result += f"""
-Estimated Value: ${price:,} if isinstance(price, int) else {price}
-Value Range: ${price_low:,} - ${price_high:,} if isinstance(price_low, int) else {price_low} - {price_high}
+
+        if response.status_code != 200:
+            return f"Valuation not available: {response.status_code} - {response.text}"
+
+        val = response.json()
+
+        price = val.get('price', 'N/A')
+        price_low = val.get('priceLow', 'N/A')
+        price_high = val.get('priceHigh', 'N/A')
+
+        price_fmt = f"${price:,}" if isinstance(price, (int, float)) else price
+        price_low_fmt = f"${price_low:,}" if isinstance(price_low, (int, float)) else price_low
+        price_high_fmt = f"${price_high:,}" if isinstance(price_high, (int, float)) else price_high
+
+        result = f"""
+MARKET VALUATION FROM RENTCAST:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Estimated Value:  {price_fmt}
+Value Range Low:  {price_low_fmt}
+Value Range High: {price_high_fmt}
 """
-        else:
-            result += f"Valuation not available: {val_response.status_code}\n"
-        
         return result
-        
+
     except Exception as e:
         return f"Error: {str(e)}"
 
@@ -157,7 +213,7 @@ def search_web(query):
     """Search the web using Google Custom Search API"""
     api_key = os.getenv("GOOGLE_API_KEY")
     cx = os.getenv("GOOGLE_CX")
-    
+
     url = "https://www.googleapis.com/customsearch/v1"
     params = {
         "key": api_key,
@@ -165,20 +221,20 @@ def search_web(query):
         "q": query,
         "num": 5
     }
-    
+
     try:
         response = requests.get(url, params=params)
         data = response.json()
-        
+
         if "items" not in data:
             return "No results found."
-        
+
         results = []
         for item in data["items"]:
             results.append(f"Title: {item['title']}\nURL: {item['link']}\nSnippet: {item['snippet']}\n")
-        
+
         return "\n---\n".join(results)
-        
+
     except Exception as e:
         return f"Search error: {str(e)}"
 

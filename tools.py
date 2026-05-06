@@ -45,6 +45,20 @@ TOOLS = [
             },
             "required": ["query"]
         }
+    },
+    {
+        "name": "get_permits",
+        "description": "Get City of Austin building permit history for a property. Shows pools, landscaping, remodels, additions and other permits pulled at the address.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "description": "Full property address"
+                }
+            },
+            "required": ["address"]
+        }
     }
 ]
 
@@ -58,6 +72,8 @@ def run_tool(tool_name, tool_input):
         return get_property_valuation(tool_input["address"])
     elif tool_name == "search_web":
         return search_web(tool_input["query"])
+    elif tool_name == "get_permits":
+        return get_permits(tool_input["address"])
     else:
         return f"Unknown tool: {tool_name}"
 
@@ -208,6 +224,46 @@ Value Range High: {price_high_fmt}
     except Exception as e:
         return f"Error: {str(e)}"
 
+
+# ─── City of Austin Permits ──────────────────────────────────────────────────
+
+def get_permits(address):
+    """Get City of Austin permit history for a property"""
+    try:
+        # Extract street number and name only e.g. "1610 VIRGINIA AVE"
+        street = address.split(",")[0].strip().upper()
+        encoded = requests.utils.quote(f"{street}%")
+
+        url = f"https://data.austintexas.gov/resource/3syk-w9eu.json?$where=original_address1+like+%27{encoded}%27&$limit=20&$order=issue_date+DESC"
+
+        response = requests.get(url, timeout=10)
+
+        if response.status_code != 200:
+            return "Permit data not available."
+
+        data = response.json()
+
+        if not data:
+            return "No permits found for this address."
+
+        result = f"CITY OF AUSTIN PERMIT HISTORY ({len(data)} permits found):\n"
+        result += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+
+        for permit in data:
+            issue_date = permit.get('issue_date', 'N/A')[:10] if permit.get('issue_date') else 'N/A'
+            result += f"\n[{issue_date}] {permit.get('permit_type_desc', 'N/A')} — {permit.get('work_class', 'N/A')}\n"
+            result += f"  Description: {permit.get('description', 'N/A')}\n"
+            result += f"  Status: {permit.get('status_current', 'N/A')}\n"
+            if permit.get('total_job_valuation'):
+                result += f"  Valuation: ${int(float(permit.get('total_job_valuation', 0))):,}\n"
+
+        return result
+
+    except Exception as e:
+        return f"Error fetching permits: {str(e)}"
+
+
+# ─── Google Search ───────────────────────────────────────────────────────────
 
 def search_web(query):
     """Search the web using Google Custom Search API"""
